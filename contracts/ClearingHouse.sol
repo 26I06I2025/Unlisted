@@ -4,42 +4,42 @@ pragma solidity ^0.8.20;
 import "./interfaces/IClearingHouse.sol";
 import "./interfaces/IVault.sol";
 import "./PositionToken.sol";
-// NOUVEAU: On importe notre boîte à outils mathématique
+// NEW: We import our mathematical toolkit
 import "./lib/FixedPointMathLib.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title ClearingHouse
- * @notice Le contrat principal qui gère la logique de trading, le vAMM et les positions.
- * @dev Ce contrat est le chef d'orchestre. Il ne détient aucun fonds lui-même.
+ * @notice The main contract that manages trading logic, vAMM and positions.
+ * @dev This contract is the orchestrator. It doesn't hold any funds itself.
  */
 contract ClearingHouse is IClearingHouse, ReentrancyGuard {
-    // NOUVEAU: On attache notre bibliothèque au type uint256.
-    // Désormais, on peut faire des choses comme `monNombre.div(autreNombre)`.
+    // NEW: We attach our library to the uint256 type.
+    // Now we can do things like `myNumber.div(otherNumber)`.
     using FixedPointMathLib for uint256;
 
-    // --- Dépendances externes ---
+    // --- External dependencies ---
     IVault public immutable vault;
     PositionToken public immutable positionToken;
     IERC20 public immutable usdc;
 
-    // --- État du vAMM (Virtual Automated Market Maker) ---
+    // --- vAMM (Virtual Automated Market Maker) state ---
     uint256 public reserve_vUSDC;
     uint256 public reserve_vTokenX;
 
-    // --- Stockage des positions ---
+    // --- Position storage ---
     struct Position {
-        uint256 collateral; // Montant de collatéral en USDC
-        Direction direction; // LONG ou SHORT
-        uint256 size; // Taille de la position en vTokenX
+        uint256 collateral; // Amount of collateral in USDC
+        Direction direction; // LONG or SHORT
+        uint256 size; // Position size in vTokenX
     }
     mapping(uint256 => Position) public positions;
     uint256 private _nextPositionId;
 
     /**
-     * @notice Initialise le ClearingHouse.
-     * @dev Le k du vAMM n'est pas stocké, il est implicite dans les réserves.
+     * @notice Initializes the ClearingHouse.
+     * @dev The vAMM's k is not stored, it's implicit in the reserves.
      */
     constructor(
         address _vaultAddress,
@@ -65,21 +65,21 @@ contract ClearingHouse is IClearingHouse, ReentrancyGuard {
     ) external override nonReentrant returns (uint256 positionId) {
         require(collateralAmount > 0, "ClearingHouse: Collateral must be positive");
 
-        // --- Calculs (partie "Effects") ---
+        // --- Calculations (Effects part) ---
         uint256 vTokenAmount;
         if (direction == Direction.LONG) {
-            // MODIFIÉ: On utilise notre fonction de précision pour calculer combien de vTokenX on obtient.
+            // MODIFIED: We use our precision function to calculate how much vTokenX we get.
             vTokenAmount = FixedPointMathLib.getAmountOut(collateralAmount, reserve_vUSDC, reserve_vTokenX);
             reserve_vUSDC += collateralAmount;
             reserve_vTokenX -= vTokenAmount;
         } else { // SHORT
-            // MODIFIÉ: Pour un short, le collatéral représente le vUSDC reçu. On doit calculer combien de vTokenX il faut "vendre" pour l'obtenir.
-            // C'est l'opération inverse, qui nécessite une autre formule AMM.
-            // Pour des raisons de simplicité ici, nous allons utiliser une approche symétrique, bien qu'une fonction getAmountIn serait plus juste.
-            // Note: Pour une V2, une fonction getAmountIn(amountOut, reserveIn, reserveOut) serait idéale.
+            // MODIFIED: For a short, the collateral represents the received vUSDC. We need to calculate how much vTokenX we need to "sell" to get it.
+            // This is the inverse operation, which requires another AMM formula.
+            // For simplicity here, we'll use a symmetric approach, although a getAmountIn function would be fairer.
+            // Note: For V2, a getAmountIn(amountOut, reserveIn, reserveOut) function would be ideal.
             vTokenAmount = FixedPointMathLib.getAmountOut(collateralAmount, reserve_vTokenX, reserve_vUSDC);
-            reserve_vTokenX += collateralAmount; // L'utilisateur vend des vTokenX...
-            reserve_vUSDC -= vTokenAmount;   // ...pour recevoir des vUSDC. 
+            reserve_vTokenX += collateralAmount; // The user sells vTokenX...
+            reserve_vUSDC -= vTokenAmount;   // ...to receive vUSDC. 
         }
 
         positionId = _nextPositionId++;
@@ -90,7 +90,7 @@ contract ClearingHouse is IClearingHouse, ReentrancyGuard {
             size: vTokenAmount
         });
 
-        // --- Interactions avec les autres contrats ---
+        // --- Interactions with other contracts ---
         usdc.transferFrom(msg.sender, address(this), collateralAmount);
         usdc.approve(address(vault), collateralAmount);
         vault.deposit(collateralAmount);
@@ -105,25 +105,25 @@ contract ClearingHouse is IClearingHouse, ReentrancyGuard {
         address owner = positionToken.ownerOf(positionId);
         require(owner == msg.sender, "ClearingHouse: Caller is not the owner of the position");
 
-        // --- Calculs (partie "Effects") ---
-        // MODIFIÉ: On utilise int256 pour pouvoir représenter les pertes négatives.
+        // --- Calculations (Effects part) ---
+        // MODIFIED: We use int256 to be able to represent negative losses.
         int256 pnl;
         
         if (pos.direction == Direction.LONG) {
-            // L'utilisateur revend ses vTokenX. On calcule combien de vUSDC il récupère.
+            // The user resells their vTokenX. We calculate how much vUSDC they get back.
             uint256 vUsdcOut = FixedPointMathLib.getAmountOut(pos.size, reserve_vTokenX, reserve_vUSDC);
             pnl = int256(vUsdcOut) - int256(pos.collateral);
             reserve_vTokenX += pos.size;
             reserve_vUSDC -= vUsdcOut;
         } else { // SHORT
-            // L'utilisateur doit racheter sa "dette" de vTokenX. On calcule combien ça lui coûte en vUSDC.
+            // The user must buy back their vTokenX "debt". We calculate how much it costs them in vUSDC.
             uint256 vUsdcIn = FixedPointMathLib.getAmountOut(pos.size, reserve_vUSDC, reserve_vTokenX);
             pnl = int256(vUsdcIn) - int256(pos.collateral);
             reserve_vUSDC += pos.size;
             reserve_vTokenX -= vUsdcIn;
         }
         
-        // MODIFIÉ: Logique de paiement grandement simplifiée et sécurisée grâce à int256.
+        // MODIFIED: Payment logic greatly simplified and secured thanks to int256.
         uint256 payoutAmount = 0;
         int256 totalToReturn = int256(pos.collateral) + pnl;
 
@@ -133,20 +133,20 @@ contract ClearingHouse is IClearingHouse, ReentrancyGuard {
         
         delete positions[positionId];
         
-        // --- Interactions avec les autres contrats ---
+        // --- Interactions with other contracts ---
         positionToken.burn(positionId);
         if (payoutAmount > 0) {
             vault.withdraw(owner, payoutAmount);
         }
     }
 
-    // --- Fonctions de lecture (View) ---
+    // --- View functions ---
 
     /**
      * @inheritdoc IClearingHouse
      */
     function getMarkPrice() external view override returns (uint256 price) {
-        // MODIFIÉ: On utilise notre fonction de division de précision. C'est propre et sûr.
+        // MODIFIED: We use our precision division function. It's clean and safe.
         return reserve_vUSDC.div(reserve_vTokenX);
     }
 

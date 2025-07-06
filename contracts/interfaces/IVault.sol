@@ -3,22 +3,22 @@ pragma solidity ^0.8.20;
 
 /**
  * @title IVault
- * @notice L'interface pour le contrat Vault, qui détient les collatéraux.
- * @dev Définit les fonctions que le ClearingHouse peut appeler sur le Vault.
+ * @notice The interface for the Vault contract, which holds the collateral.
+ * @dev Defines the functions that the ClearingHouse can call on the Vault.
  */
 interface IVault {
     /**
-     * @notice Dépose des fonds (USDC) dans le Vault.
-     * @dev Doit uniquement être appelable par le ClearingHouse.
-     * @param amount Le montant d'USDC à déposer.
+     * @notice Deposits funds (USDC) into the Vault.
+     * @dev Must only be callable by the ClearingHouse.
+     * @param amount The amount of USDC to deposit.
      */
     function deposit(uint256 amount) external;
 
     /**
-     * @notice Retire des fonds (USDC) du Vault.
-     * @dev Doit uniquement être appelable par le ClearingHouse.
-     * @param to L'adresse du destinataire des fonds.
-     * @param amount Le montant d'USDC à retirer.
+     * @notice Withdraws funds (USDC) from the Vault.
+     * @dev Must only be callable by the ClearingHouse.
+     * @param to The address of the recipient of the funds.
+     * @param amount The amount of USDC to withdraw.
      */
     function withdraw(address to, uint256 amount) external;
 }

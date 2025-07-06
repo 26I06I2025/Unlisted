@@ -3,12 +3,12 @@ pragma solidity ^0.8.20;
 
 /**
  * @title IClearingHouse
- * @notice L'interface principale du protocole de trading.
- * @dev Définit l'API publique pour interagir avec le système.
+ * @notice The main interface of the trading protocol.
+ * @dev Defines the public API for interacting with the system.
  */
 interface IClearingHouse {
     /**
-     * @notice Énumération pour définir la direction d'une position.
+     * @notice Enumeration to define the direction of a position.
      */
     enum Direction {
         LONG,
@@ -16,11 +16,11 @@ interface IClearingHouse {
     }
 
     /**
-     * @notice Structure pour retourner les informations d'une position de manière lisible.
-     * @param owner Le propriétaire actuel de la position (détenteur du NFT).
-     * @param collateral Le montant du collatéral (en USDC) déposé.
-     * @param direction La direction de la position (LONG ou SHORT).
-     * @param size La taille de la position (en vToken).
+     * @notice Structure to return position information in a readable format.
+     * @param owner The current owner of the position (NFT holder).
+     * @param collateral The amount of collateral (in USDC) deposited.
+     * @param direction The direction of the position (LONG or SHORT).
+     * @param size The size of the position (in vToken).
      */
     struct PositionView {
         address owner;
@@ -30,10 +30,10 @@ interface IClearingHouse {
     }
 
     /**
-     * @notice Ouvre une nouvelle position de trading.
-     * @param collateralAmount Le montant de collatéral (USDC) à déposer.
-     * @param direction La direction souhaitée pour la position (LONG ou SHORT).
-     * @return positionId L'ID unique de la position nouvellement créée (qui est aussi le tokenId du NFT).
+     * @notice Opens a new trading position.
+     * @param collateralAmount The amount of collateral (USDC) to deposit.
+     * @param direction The desired direction for the position (LONG or SHORT).
+     * @return positionId The unique ID of the newly created position (which is also the NFT tokenId).
      */
     function openPosition(
         uint256 collateralAmount,
@@ -41,22 +41,22 @@ interface IClearingHouse {
     ) external returns (uint256 positionId);
 
     /**
-     * @notice Ferme une position de trading existante.
-     * @dev Le PNL est calculé et les fonds (collatéral +/- PNL) sont envoyés au propriétaire de la position.
-     * @param positionId L'ID de la position à fermer.
+     * @notice Closes an existing trading position.
+     * @dev The PNL is calculated and funds (collateral +/- PNL) are sent to the position owner.
+     * @param positionId The ID of the position to close.
      */
     function closePosition(uint256 positionId) external;
 
     /**
-     * @notice Récupère le prix actuel du marché tel que défini par le vAMM.
-     * @return price Le prix actuel, représenté avec une précision de 18 décimales.
+     * @notice Retrieves the current market price as defined by the vAMM.
+     * @return price The current price, represented with 18 decimal precision.
      */
     function getMarkPrice() external view returns (uint256 price);
 
     /**
-     * @notice Récupère les informations détaillées d'une position spécifique.
-     * @param positionId L'ID de la position à consulter.
-     * @return La structure PositionView avec les détails de la position.
+     * @notice Retrieves detailed information of a specific position.
+     * @param positionId The ID of the position to query.
+     * @return The PositionView structure with the position details.
      */
     function getPosition(
         uint256 positionId

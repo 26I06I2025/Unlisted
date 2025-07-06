@@ -6,21 +6,21 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title Vault
- * @notice Contrat simple qui sécurise tous les collatéraux (USDC) du protocole.
- * @dev Ce contrat est délibérément "stupide". Sa seule sécurité repose sur le fait
- * que seul le ClearingHouse peut appeler ses fonctions de dépôt et de retrait.
+ * @notice Simple contract that secures all collateral (USDC) of the protocol.
+ * @dev This contract is deliberately "dumb". Its only security relies on the fact
+ * that only the ClearingHouse can call its deposit and withdrawal functions.
  */
 contract Vault is IVault {
-    // L'adresse du contrat ClearingHouse, qui est le seul autorisé à gérer les fonds.
-    // "immutable" signifie que cette adresse est définie une fois pour toutes à la création et ne peut plus jamais être changée.
-    // C'est plus sûr et moins coûteux en gas.
+    // The address of the ClearingHouse contract, which is the only one authorized to manage funds.
+    // "immutable" means this address is set once and for all at creation and can never be changed.
+    // This is safer and less expensive in gas.
     address public immutable clearingHouse;
 
-    // L'interface du token USDC utilisé comme collatéral.
+    // The interface of the USDC token used as collateral.
     IERC20 public immutable usdc;
 
     /**
-     * @dev Le modifier qui vérifie si l'appelant est bien le ClearingHouse.
+     * @dev The modifier that checks if the caller is the ClearingHouse.
      */
     modifier onlyClearingHouse() {
         require(msg.sender == clearingHouse, "Vault: Caller is not the ClearingHouse");
@@ -28,9 +28,9 @@ contract Vault is IVault {
     }
 
     /**
-     * @notice Le constructeur est appelé une seule fois lors du déploiement du contrat.
-     * @param _clearingHouse L'adresse du contrat ClearingHouse à autoriser.
-     * @param _usdc L'adresse du contrat du token USDC.
+     * @notice The constructor is called only once during contract deployment.
+     * @param _clearingHouse The address of the ClearingHouse contract to authorize.
+     * @param _usdc The address of the USDC token contract.
      */
     constructor(address _clearingHouse, address _usdc) {
         require(_clearingHouse != address(0), "Vault: Invalid ClearingHouse address");
@@ -40,21 +40,21 @@ contract Vault is IVault {
     }
 
     /**
-     * @notice Reçoit des USDC depuis le ClearingHouse et les stocke dans ce contrat.
+     * @notice Receives USDC from the ClearingHouse and stores it in this contract.
      * @inheritdoc IVault
      */
     function deposit(uint256 amount) external override onlyClearingHouse {
-        // Le ClearingHouse a déjà pris les fonds de l'utilisateur.
-        // Maintenant, il transfère ces fonds de lui-même vers le Vault pour les sécuriser.
+        // The ClearingHouse has already taken funds from the user.
+        // Now, it transfers these funds from itself to the Vault to secure them.
         usdc.transferFrom(clearingHouse, address(this), amount);
     }
 
     /**
-     * @notice Envoie des USDC depuis le Vault vers un destinataire.
+     * @notice Sends USDC from the Vault to a recipient.
      * @inheritdoc IVault
      */
     function withdraw(address to, uint256 amount) external override onlyClearingHouse {
-        // Envoie les fonds directement au destinataire final (l'utilisateur qui ferme sa position).
+        // Send funds directly to the final recipient (the user closing their position).
         usdc.transfer(to, amount);
     }
 }

@@ -5,17 +5,17 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 /**
  * @title PositionToken
- * @notice Un contrat ERC721 (NFT) pour représenter la propriété des positions de trading.
- * @dev Ce contrat est un simple wrapper autour du standard ERC721 d'OpenZeppelin.
- * Sa seule logique personnalisée est de s'assurer que seul le ClearingHouse peut
- * créer (mint) ou détruire (burn) des tokens.
+ * @notice An ERC721 (NFT) contract to represent ownership of trading positions.
+ * @dev This contract is a simple wrapper around OpenZeppelin's ERC721 standard.
+ * Its only custom logic is to ensure that only the ClearingHouse can
+ * create (mint) or destroy (burn) tokens.
  */
 contract PositionToken is ERC721 {
-    // L'adresse du contrat ClearingHouse, le seul autorisé à gérer les tokens.
+    // The address of the ClearingHouse contract, the only one authorized to manage tokens.
     address public immutable clearingHouse;
 
     /**
-     * @dev Le modifier qui vérifie si l'appelant est bien le ClearingHouse.
+     * @dev The modifier that checks if the caller is the ClearingHouse.
      */
     modifier onlyClearingHouse() {
         require(msg.sender == clearingHouse, "PositionToken: Caller is not the ClearingHouse");
@@ -23,8 +23,8 @@ contract PositionToken is ERC721 {
     }
 
     /**
-     * @notice Le constructeur.
-     * @param _clearingHouse L'adresse du contrat ClearingHouse à autoriser.
+     * @notice The constructor.
+     * @param _clearingHouse The address of the ClearingHouse contract to authorize.
      */
     constructor(address _clearingHouse) ERC721("DeFi Protocol Position", "DPP") {
         require(_clearingHouse != address(0), "PositionToken: Invalid ClearingHouse address");
@@ -32,19 +32,19 @@ contract PositionToken is ERC721 {
     }
 
     /**
-     * @notice Crée un nouveau NFT de position.
-     * @dev Ne peut être appelé que par le ClearingHouse lorsqu'une position est ouverte.
-     * @param to L'adresse du nouveau propriétaire de la position.
-     * @param tokenId L'ID unique de la nouvelle position.
+     * @notice Creates a new position NFT.
+     * @dev Can only be called by the ClearingHouse when a position is opened.
+     * @param to The address of the new position owner.
+     * @param tokenId The unique ID of the new position.
      */
     function mint(address to, uint256 tokenId) external onlyClearingHouse {
         _mint(to, tokenId);
     }
 
     /**
-     * @notice Détruit un NFT de position existant.
-     * @dev Ne peut être appelé que par le ClearingHouse lorsqu'une position est fermée.
-     * @param tokenId L'ID de la position à détruire.
+     * @notice Destroys an existing position NFT.
+     * @dev Can only be called by the ClearingHouse when a position is closed.
+     * @param tokenId The ID of the position to destroy.
      */
     function burn(uint256 tokenId) external onlyClearingHouse {
         _burn(tokenId);
