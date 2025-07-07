@@ -4,8 +4,7 @@ pragma solidity ^0.8.20;
 import "./interfaces/IClearingHouse.sol";
 import "./interfaces/IVault.sol";
 import "./PositionToken.sol";
-// NEW: We import our mathematical toolkit
-import "./lib/FixedPointMathLib.sol";
+import "./lib/AMMMathLib.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -15,9 +14,6 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * @dev This contract is the orchestrator. It doesn't hold any funds itself.
  */
 contract ClearingHouse is IClearingHouse, ReentrancyGuard {
-    // NEW: We attach our library to the uint256 type.
-    // Now we can do things like `myNumber.div(otherNumber)`.
-    using FixedPointMathLib for uint256;
 
     // --- External dependencies ---
     IVault public immutable vault;
@@ -65,22 +61,24 @@ contract ClearingHouse is IClearingHouse, ReentrancyGuard {
     ) external override nonReentrant returns (uint256 positionId) {
         require(collateralAmount > 0, "ClearingHouse: Collateral must be positive");
 
-        // --- Calculations (Effects part) ---
+        // --- Calculations (delegated to AMMMathLib) ---
         uint256 vTokenAmount;
+        uint256 newReserve_vUSDC;
+        uint256 newReserve_vTokenX;
+        
         if (direction == Direction.LONG) {
-            // MODIFIED: We use our precision function to calculate how much vTokenX we get.
-            vTokenAmount = FixedPointMathLib.getAmountOut(collateralAmount, reserve_vUSDC, reserve_vTokenX);
-            reserve_vUSDC += collateralAmount;
-            reserve_vTokenX -= vTokenAmount;
+            (vTokenAmount, newReserve_vUSDC, newReserve_vTokenX) = AMMMathLib.calculateLongOpen(
+                collateralAmount, reserve_vUSDC, reserve_vTokenX
+            );
         } else { // SHORT
-            // MODIFIED: For a short, the collateral represents the received vUSDC. We need to calculate how much vTokenX we need to "sell" to get it.
-            // This is the inverse operation, which requires another AMM formula.
-            // For simplicity here, we'll use a symmetric approach, although a getAmountIn function would be fairer.
-            // Note: For V2, a getAmountIn(amountOut, reserveIn, reserveOut) function would be ideal.
-            vTokenAmount = FixedPointMathLib.getAmountOut(collateralAmount, reserve_vTokenX, reserve_vUSDC);
-            reserve_vTokenX += collateralAmount; // The user sells vTokenX...
-            reserve_vUSDC -= vTokenAmount;   // ...to receive vUSDC. 
+            (vTokenAmount, newReserve_vUSDC, newReserve_vTokenX) = AMMMathLib.calculateShortOpen(
+                collateralAmount, reserve_vUSDC, reserve_vTokenX
+            );
         }
+        
+        // Update reserves
+        reserve_vUSDC = newReserve_vUSDC;
+        reserve_vTokenX = newReserve_vTokenX;
 
         positionId = _nextPositionId++;
 
@@ -105,23 +103,24 @@ contract ClearingHouse is IClearingHouse, ReentrancyGuard {
         address owner = positionToken.ownerOf(positionId);
         require(owner == msg.sender, "ClearingHouse: Caller is not the owner of the position");
 
-        // --- Calculations (Effects part) ---
-        // MODIFIED: We use int256 to be able to represent negative losses.
+        // --- Calculations (delegated to AMMMathLib) ---
         int256 pnl;
+        uint256 newReserve_vUSDC;
+        uint256 newReserve_vTokenX;
         
         if (pos.direction == Direction.LONG) {
-            // The user resells their vTokenX. We calculate how much vUSDC they get back.
-            uint256 vUsdcOut = FixedPointMathLib.getAmountOut(pos.size, reserve_vTokenX, reserve_vUSDC);
-            pnl = int256(vUsdcOut) - int256(pos.collateral);
-            reserve_vTokenX += pos.size;
-            reserve_vUSDC -= vUsdcOut;
+            (pnl, newReserve_vUSDC, newReserve_vTokenX) = AMMMathLib.calculateLongClose(
+                pos.size, pos.collateral, reserve_vUSDC, reserve_vTokenX
+            );
         } else { // SHORT
-            // The user must buy back their vTokenX "debt". We calculate how much it costs them in vUSDC.
-            uint256 vUsdcIn = FixedPointMathLib.getAmountOut(pos.size, reserve_vUSDC, reserve_vTokenX);
-            pnl = int256(vUsdcIn) - int256(pos.collateral);
-            reserve_vUSDC += pos.size;
-            reserve_vTokenX -= vUsdcIn;
+            (pnl, newReserve_vUSDC, newReserve_vTokenX) = AMMMathLib.calculateShortClose(
+                pos.size, pos.collateral, reserve_vUSDC, reserve_vTokenX
+            );
         }
+        
+        // Update reserves
+        reserve_vUSDC = newReserve_vUSDC;
+        reserve_vTokenX = newReserve_vTokenX;
         
         // MODIFIED: Payment logic greatly simplified and secured thanks to int256.
         uint256 payoutAmount = 0;
@@ -146,8 +145,7 @@ contract ClearingHouse is IClearingHouse, ReentrancyGuard {
      * @inheritdoc IClearingHouse
      */
     function getMarkPrice() external view override returns (uint256 price) {
-        // MODIFIED: We use our precision division function. It's clean and safe.
-        return reserve_vUSDC.div(reserve_vTokenX);
+        return AMMMathLib.calculateMarkPrice(reserve_vUSDC, reserve_vTokenX);
     }
 
     /**

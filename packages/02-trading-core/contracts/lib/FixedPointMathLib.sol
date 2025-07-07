@@ -68,4 +68,30 @@ library FixedPointMathLib {
 
         return amountOut;
     }
+
+    /**
+     * @notice Calculates the input amount required for a given output amount in an AMM x*y=k.
+     * @dev This is the inverse of getAmountOut, using the proven Uniswap V2 formula.
+     * @param amountOut The desired amount of the token exiting the pool.
+     * @param reserveIn The reserve of the token entering, before the swap.
+     * @param reserveOut The reserve of the token exiting, before the swap.
+     * @return amountIn The required amount of the token entering the pool.
+     */
+    function getAmountIn(
+        uint256 amountOut,
+        uint256 reserveIn,
+        uint256 reserveOut
+    ) internal pure returns (uint256 amountIn) {
+        require(amountOut > 0, "AMM: insufficient output amount");
+        require(reserveIn > 0 && reserveOut > 0, "AMM: insufficient liquidity");
+        require(amountOut < reserveOut, "AMM: insufficient liquidity for output");
+
+        // The Uniswap V2 formula: amountIn = (amountOut * reserveIn) / (reserveOut - amountOut) + 1
+        // The +1 ensures rounding up to prevent precision loss
+        uint256 numerator = amountOut * reserveIn;
+        uint256 denominator = reserveOut - amountOut;
+        amountIn = numerator / denominator + 1;
+
+        return amountIn;
+    }
 }
