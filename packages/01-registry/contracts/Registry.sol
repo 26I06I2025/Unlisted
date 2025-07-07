@@ -195,30 +195,14 @@ contract Registry is IRegistry, Ownable {
     }
 
     /**
-     * @notice Retourne le prix actuel d'un marché basé sur ses réserves.
-     * @dev Implémentation de l'interface IRegistry.
-     * @param _marketAddress L'adresse du marché à interroger.
-     * @return price Le prix actuel (reserve_vUSDC / reserve_vTokenX).
-     */
-    function getMarketPrice(address _marketAddress) external view override returns (uint256 price) {
-        Market storage market = markets[_marketAddress];
-        require(market.status != MarketStatus.None, "Registry: Market does not exist");
-        require(market.reserve_vTokenX > 0, "Registry: No vTokenX liquidity");
-        
-        return market.reserve_vUSDC * 1e18 / market.reserve_vTokenX;
-    }
-
-    /**
      * @notice Retourne les réserves virtuelles d'un marché.
-     * @dev Implémentation de l'interface IRegistry.
-     * @param _marketAddress L'adresse du marché à interroger.
+     * @param marketAddress L'adresse du marché à interroger.
      * @return vUSDC Les réserves virtuelles en USDC.
      * @return vTokenX Les réserves virtuelles en TokenX.
      */
-    function getMarketReserves(address _marketAddress) external view override returns (uint256 vUSDC, uint256 vTokenX) {
-        Market storage market = markets[_marketAddress];
-        require(market.status != MarketStatus.None, "Registry: Market does not exist");
-        
+    function getMarketReserves(address marketAddress) external view returns (uint256 vUSDC, uint256 vTokenX) {
+        Market storage market = markets[marketAddress];
+        require(market.status != MarketStatus.None, "Market does not exist");
         return (market.reserve_vUSDC, market.reserve_vTokenX);
     }
 }

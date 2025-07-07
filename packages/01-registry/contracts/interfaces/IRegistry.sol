@@ -36,13 +36,6 @@ interface IRegistry {
     function getMarketStatus(address marketAddress) external view returns (MarketStatus);
 
     /**
-     * @notice Retourne le prix actuel d'un marché basé sur ses réserves.
-     * @param marketAddress L'adresse du marché à interroger.
-     * @return price Le prix actuel calculé (reserve_vUSDC / reserve_vTokenX).
-     */
-    function getMarketPrice(address marketAddress) external view returns (uint256 price);
-
-    /**
      * @notice Retourne les réserves virtuelles d'un marché.
      * @param marketAddress L'adresse du marché à interroger.
      * @return vUSDC Les réserves virtuelles en USDC.
