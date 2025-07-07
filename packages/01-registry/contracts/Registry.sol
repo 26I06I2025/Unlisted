@@ -21,6 +21,9 @@ contract Registry is IRegistry, Ownable {
         string name;
         string symbol;
         MarketStatus status;
+        uint256 reserve_vUSDC;     // Réserves virtuelles USDC
+        uint256 reserve_vTokenX;   // Réserves virtuelles TokenX
+        uint256 createdAt;         // Timestamp de création
     }
 
     mapping(address => Market) public markets;
@@ -59,18 +62,61 @@ contract Registry is IRegistry, Ownable {
     }
 
     /**
-     * @notice Crée un nouveau marché, initialisé à l'état "Created".
+     * @notice Crée un nouveau marché avec des réserves initiales définissant le prix.
      * @param _marketAddress L'adresse du token qui représentera ce marché.
      * @param _name Le nom complet du marché (ex: "Ethereum Natif").
      * @param _symbol Le symbole du marché (ex: "N-ETH").
+     * @param _reserve_vUSDC Les réserves virtuelles initiales en USDC.
+     * @param _reserve_vTokenX Les réserves virtuelles initiales en TokenX.
      */
-    function createMarket(address _marketAddress, string memory _name, string memory _symbol) external onlyOwner {
+    function createMarket(
+        address _marketAddress, 
+        string memory _name, 
+        string memory _symbol,
+        uint256 _reserve_vUSDC,
+        uint256 _reserve_vTokenX
+    ) external onlyOwner {
         require(markets[_marketAddress].status == MarketStatus.None, "Registry: Market already exists");
+        require(_reserve_vUSDC > 0, "Registry: vUSDC reserves must be positive");
+        require(_reserve_vTokenX > 0, "Registry: vTokenX reserves must be positive");
         
-        markets[_marketAddress] = Market(_name, _symbol, MarketStatus.Created);
+        markets[_marketAddress] = Market({
+            name: _name,
+            symbol: _symbol,
+            status: MarketStatus.Created,
+            reserve_vUSDC: _reserve_vUSDC,
+            reserve_vTokenX: _reserve_vTokenX,
+            createdAt: block.timestamp
+        });
         
         emit MarketCreated(_marketAddress, _name, _symbol);
         emit MarketStatusChanged(_marketAddress, MarketStatus.Created);
+        emit MarketReservesSet(_marketAddress, _reserve_vUSDC, _reserve_vTokenX);
+    }
+
+    /**
+     * @notice Ajuste les réserves d'un marché pour modifier son prix.
+     * @dev Seul l'owner peut modifier les prix. Le marché doit exister.
+     * @param _marketAddress L'adresse du marché à modifier.
+     * @param _newReserve_vUSDC Les nouvelles réserves virtuelles en USDC.
+     * @param _newReserve_vTokenX Les nouvelles réserves virtuelles en TokenX.
+     */
+    function adjustMarketReserves(
+        address _marketAddress,
+        uint256 _newReserve_vUSDC,
+        uint256 _newReserve_vTokenX
+    ) external onlyOwner marketExists(_marketAddress) {
+        require(_newReserve_vUSDC > 0, "Registry: vUSDC reserves must be positive");
+        require(_newReserve_vTokenX > 0, "Registry: vTokenX reserves must be positive");
+        
+        Market storage market = markets[_marketAddress];
+        uint256 oldUSDC = market.reserve_vUSDC;
+        uint256 oldTokenX = market.reserve_vTokenX;
+        
+        market.reserve_vUSDC = _newReserve_vUSDC;
+        market.reserve_vTokenX = _newReserve_vTokenX;
+        
+        emit MarketReservesUpdated(_marketAddress, oldUSDC, oldTokenX, _newReserve_vUSDC, _newReserve_vTokenX);
     }
 
     /**
@@ -146,5 +192,33 @@ contract Registry is IRegistry, Ownable {
      */
     function getMarketStatus(address _marketAddress) public view override returns (MarketStatus) {
         return markets[_marketAddress].status;
+    }
+
+    /**
+     * @notice Retourne le prix actuel d'un marché basé sur ses réserves.
+     * @dev Implémentation de l'interface IRegistry.
+     * @param _marketAddress L'adresse du marché à interroger.
+     * @return price Le prix actuel (reserve_vUSDC / reserve_vTokenX).
+     */
+    function getMarketPrice(address _marketAddress) external view override returns (uint256 price) {
+        Market storage market = markets[_marketAddress];
+        require(market.status != MarketStatus.None, "Registry: Market does not exist");
+        require(market.reserve_vTokenX > 0, "Registry: No vTokenX liquidity");
+        
+        return market.reserve_vUSDC * 1e18 / market.reserve_vTokenX;
+    }
+
+    /**
+     * @notice Retourne les réserves virtuelles d'un marché.
+     * @dev Implémentation de l'interface IRegistry.
+     * @param _marketAddress L'adresse du marché à interroger.
+     * @return vUSDC Les réserves virtuelles en USDC.
+     * @return vTokenX Les réserves virtuelles en TokenX.
+     */
+    function getMarketReserves(address _marketAddress) external view override returns (uint256 vUSDC, uint256 vTokenX) {
+        Market storage market = markets[_marketAddress];
+        require(market.status != MarketStatus.None, "Registry: Market does not exist");
+        
+        return (market.reserve_vUSDC, market.reserve_vTokenX);
     }
 }
