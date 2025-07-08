@@ -18,12 +18,14 @@ interface IClearingHouse {
     /**
      * @notice Structure to return position information in a readable format.
      * @param owner The current owner of the position (NFT holder).
+     * @param marketToken The market token this position is for.
      * @param collateral The amount of collateral (in USDC) deposited.
      * @param direction The direction of the position (LONG or SHORT).
      * @param size The size of the position (in vToken).
      */
     struct PositionView {
         address owner;
+        address marketToken;
         uint256 collateral;
         Direction direction;
         uint256 size;
@@ -31,11 +33,13 @@ interface IClearingHouse {
 
     /**
      * @notice Opens a new trading position.
+     * @param marketToken The market token to trade (e.g., ETH, BTC).
      * @param collateralAmount The amount of collateral (USDC) to deposit.
      * @param direction The desired direction for the position (LONG or SHORT).
      * @return positionId The unique ID of the newly created position (which is also the NFT tokenId).
      */
     function openPosition(
+        address marketToken,
         uint256 collateralAmount,
         Direction direction
     ) external returns (uint256 positionId);
@@ -49,9 +53,10 @@ interface IClearingHouse {
 
     /**
      * @notice Retrieves the current market price as defined by the vAMM.
+     * @param marketToken The market token to get the price for.
      * @return price The current price, represented with 18 decimal precision.
      */
-    function getMarkPrice() external view returns (uint256 price);
+    function getMarkPrice(address marketToken) external view returns (uint256 price);
 
     /**
      * @notice Retrieves detailed information of a specific position.

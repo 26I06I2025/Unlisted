@@ -89,6 +89,11 @@ contract Registry is IRegistry, Ownable {
             createdAt: block.timestamp
         });
         
+        // Initialize market in Trading Core
+        if (address(tradingCore) != address(0)) {
+            tradingCore.initializeMarket(_marketAddress, _reserve_vUSDC, _reserve_vTokenX);
+        }
+        
         emit MarketCreated(_marketAddress, _name, _symbol);
         emit MarketStatusChanged(_marketAddress, MarketStatus.Created);
         emit MarketReservesSet(_marketAddress, _reserve_vUSDC, _reserve_vTokenX);

@@ -8,6 +8,14 @@ pragma solidity ^0.8.20;
  */
 interface ITradingCore {
     /**
+     * @notice Initialise un nouveau marché dans le Trading Core.
+     * @param marketToken L'adresse du token de marché.
+     * @param vUSDC Les réserves virtuelles initiales en USDC.
+     * @param vTokenX Les réserves virtuelles initiales en TokenX.
+     */
+    function initializeMarket(address marketToken, uint256 vUSDC, uint256 vTokenX) external;
+
+    /**
      * @notice Ordonne au Trading Core de figer le prix d'un marché pour le règlement final.
      * @param marketAddress L'adresse du marché à geler.
      */

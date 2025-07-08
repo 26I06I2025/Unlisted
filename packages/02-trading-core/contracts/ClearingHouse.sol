@@ -7,25 +7,31 @@ import "./PositionToken.sol";
 import "./lib/AMMMathLib.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "../../01-registry/contracts/interfaces/ITradingCore.sol";
 
 /**
  * @title ClearingHouse
  * @notice The main contract that manages trading logic, vAMM and positions.
  * @dev This contract is the orchestrator. It doesn't hold any funds itself.
  */
-contract ClearingHouse is IClearingHouse, ReentrancyGuard {
+contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
 
     // --- External dependencies ---
     IVault public immutable vault;
     PositionToken public immutable positionToken;
     IERC20 public immutable usdc;
 
-    // --- vAMM (Virtual Automated Market Maker) state ---
-    uint256 public reserve_vUSDC;
-    uint256 public reserve_vTokenX;
+    // --- Multi-market vAMM state ---
+    struct Market {
+        uint256 reserve_vUSDC;
+        uint256 reserve_vTokenX;
+        bool isActive;
+    }
+    mapping(address => Market) public markets;
 
     // --- Position storage ---
     struct Position {
+        address marketToken; // Which market this position is for
         uint256 collateral; // Amount of collateral in USDC
         Direction direction; // LONG or SHORT
         uint256 size; // Position size in vTokenX
@@ -35,20 +41,15 @@ contract ClearingHouse is IClearingHouse, ReentrancyGuard {
 
     /**
      * @notice Initializes the ClearingHouse.
-     * @dev The vAMM's k is not stored, it's implicit in the reserves.
      */
     constructor(
         address _vaultAddress,
         address _positionTokenAddress,
-        address _usdcAddress,
-        uint256 _initial_vUSDC,
-        uint256 _initial_vTokenX
+        address _usdcAddress
     ) {
         vault = IVault(_vaultAddress);
         positionToken = PositionToken(_positionTokenAddress);
         usdc = IERC20(_usdcAddress);
-        reserve_vUSDC = _initial_vUSDC;
-        reserve_vTokenX = _initial_vTokenX;
         _nextPositionId = 1;
     }
 
@@ -56,10 +57,14 @@ contract ClearingHouse is IClearingHouse, ReentrancyGuard {
      * @inheritdoc IClearingHouse
      */
     function openPosition(
+        address marketToken,
         uint256 collateralAmount,
         Direction direction
     ) external override nonReentrant returns (uint256 positionId) {
         require(collateralAmount > 0, "ClearingHouse: Collateral must be positive");
+        
+        Market storage market = markets[marketToken];
+        require(market.isActive, "ClearingHouse: Market not active");
 
         // --- Calculations (delegated to AMMMathLib) ---
         uint256 vTokenAmount;
@@ -68,21 +73,22 @@ contract ClearingHouse is IClearingHouse, ReentrancyGuard {
         
         if (direction == Direction.LONG) {
             (vTokenAmount, newReserve_vUSDC, newReserve_vTokenX) = AMMMathLib.calculateLongOpen(
-                collateralAmount, reserve_vUSDC, reserve_vTokenX
+                collateralAmount, market.reserve_vUSDC, market.reserve_vTokenX
             );
         } else { // SHORT
             (vTokenAmount, newReserve_vUSDC, newReserve_vTokenX) = AMMMathLib.calculateShortOpen(
-                collateralAmount, reserve_vUSDC, reserve_vTokenX
+                collateralAmount, market.reserve_vUSDC, market.reserve_vTokenX
             );
         }
         
         // Update reserves
-        reserve_vUSDC = newReserve_vUSDC;
-        reserve_vTokenX = newReserve_vTokenX;
+        market.reserve_vUSDC = newReserve_vUSDC;
+        market.reserve_vTokenX = newReserve_vTokenX;
 
         positionId = _nextPositionId++;
 
         positions[positionId] = Position({
+            marketToken: marketToken,
             collateral: collateralAmount,
             direction: direction,
             size: vTokenAmount
@@ -103,6 +109,8 @@ contract ClearingHouse is IClearingHouse, ReentrancyGuard {
         address owner = positionToken.ownerOf(positionId);
         require(owner == msg.sender, "ClearingHouse: Caller is not the owner of the position");
 
+        Market storage market = markets[pos.marketToken];
+
         // --- Calculations (delegated to AMMMathLib) ---
         int256 pnl;
         uint256 newReserve_vUSDC;
@@ -110,19 +118,19 @@ contract ClearingHouse is IClearingHouse, ReentrancyGuard {
         
         if (pos.direction == Direction.LONG) {
             (pnl, newReserve_vUSDC, newReserve_vTokenX) = AMMMathLib.calculateLongClose(
-                pos.size, pos.collateral, reserve_vUSDC, reserve_vTokenX
+                pos.size, pos.collateral, market.reserve_vUSDC, market.reserve_vTokenX
             );
         } else { // SHORT
             (pnl, newReserve_vUSDC, newReserve_vTokenX) = AMMMathLib.calculateShortClose(
-                pos.size, pos.collateral, reserve_vUSDC, reserve_vTokenX
+                pos.size, pos.collateral, market.reserve_vUSDC, market.reserve_vTokenX
             );
         }
         
         // Update reserves
-        reserve_vUSDC = newReserve_vUSDC;
-        reserve_vTokenX = newReserve_vTokenX;
+        market.reserve_vUSDC = newReserve_vUSDC;
+        market.reserve_vTokenX = newReserve_vTokenX;
         
-        // MODIFIED: Payment logic greatly simplified and secured thanks to int256.
+        // Payment logic
         uint256 payoutAmount = 0;
         int256 totalToReturn = int256(pos.collateral) + pnl;
 
@@ -144,8 +152,9 @@ contract ClearingHouse is IClearingHouse, ReentrancyGuard {
     /**
      * @inheritdoc IClearingHouse
      */
-    function getMarkPrice() external view override returns (uint256 price) {
-        return AMMMathLib.calculateMarkPrice(reserve_vUSDC, reserve_vTokenX);
+    function getMarkPrice(address marketToken) external view override returns (uint256 price) {
+        Market storage market = markets[marketToken];
+        return AMMMathLib.calculateMarkPrice(market.reserve_vUSDC, market.reserve_vTokenX);
     }
 
     /**
@@ -159,9 +168,45 @@ contract ClearingHouse is IClearingHouse, ReentrancyGuard {
         address owner = positionToken.ownerOf(positionId);
         return PositionView({
             owner: owner,
+            marketToken: pos.marketToken,
             collateral: pos.collateral,
             direction: pos.direction,
             size: pos.size
         });
+    }
+
+    // --- ITradingCore Implementation ---
+
+    /**
+     * @inheritdoc ITradingCore
+     */
+    function initializeMarket(address marketToken, uint256 vUSDC, uint256 vTokenX) external override {
+        require(marketToken != address(0), "ClearingHouse: Invalid market token");
+        require(vUSDC > 0 && vTokenX > 0, "ClearingHouse: Invalid reserves");
+        require(!markets[marketToken].isActive, "ClearingHouse: Market already exists");
+        
+        markets[marketToken] = Market({
+            reserve_vUSDC: vUSDC,
+            reserve_vTokenX: vTokenX,
+            isActive: true
+        });
+    }
+
+    /**
+     * @inheritdoc ITradingCore
+     */
+    function freezePrice(address marketAddress) external override {
+        // TODO: Implement price freezing logic
+        Market storage market = markets[marketAddress];
+        market.isActive = false;
+    }
+
+    /**
+     * @inheritdoc ITradingCore
+     */
+    function hasOpenPositions(address marketAddress) external view override returns (bool) {
+        // TODO: Implement proper position checking
+        // For now, return false to allow archiving
+        return false;
     }
 }
