@@ -22,6 +22,8 @@ interface IClearingHouse {
      * @param collateral The amount of collateral (in USDC) deposited.
      * @param direction The direction of the position (LONG or SHORT).
      * @param size The size of the position (in vToken).
+     * @param entryPrice The price when position was opened.
+     * @param timestamp When the position was opened.
      */
     struct PositionView {
         address owner;
@@ -29,7 +31,49 @@ interface IClearingHouse {
         uint256 collateral;
         Direction direction;
         uint256 size;
+        uint256 entryPrice;
+        uint256 timestamp;
     }
+
+    // === EVENTS ===
+    
+    /**
+     * @notice Emitted when a new position is opened
+     * @param positionId The unique ID of the position
+     * @param user The address that opened the position
+     * @param marketToken The market token being traded
+     * @param direction LONG or SHORT
+     * @param collateral Amount of USDC collateral deposited
+     * @param size Position size in vTokenX
+     * @param entryPrice Price at which the position was opened
+     * @param timestamp When the position was opened
+     */
+    event PositionOpened(
+        uint256 indexed positionId,
+        address indexed user,
+        address indexed marketToken,
+        Direction direction,
+        uint256 collateral,
+        uint256 size,
+        uint256 entryPrice,
+        uint256 timestamp
+    );
+
+    /**
+     * @notice Emitted when a position is closed
+     * @param positionId The unique ID of the position
+     * @param user The address that closed the position
+     * @param pnl Profit/Loss in USDC (can be negative)
+     * @param payout Total amount paid out to user
+     * @param timestamp When the position was closed
+     */
+    event PositionClosed(
+        uint256 indexed positionId,
+        address indexed user,
+        int256 pnl,
+        uint256 payout,
+        uint256 timestamp
+    );
 
     /**
      * @notice Opens a new trading position.

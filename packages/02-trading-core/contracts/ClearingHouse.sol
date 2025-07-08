@@ -35,6 +35,8 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
         uint256 collateral; // Amount of collateral in USDC
         Direction direction; // LONG or SHORT
         uint256 size; // Position size in vTokenX
+        uint256 entryPrice; // Price when position was opened
+        uint256 timestamp; // When position was opened
     }
     mapping(uint256 => Position) public positions;
     uint256 private _nextPositionId;
@@ -87,11 +89,16 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
 
         positionId = _nextPositionId++;
 
+        // Calculate entry price before opening position
+        uint256 entryPrice = AMMMathLib.calculateMarkPrice(market.reserve_vUSDC, market.reserve_vTokenX);
+
         positions[positionId] = Position({
             marketToken: marketToken,
             collateral: collateralAmount,
             direction: direction,
-            size: vTokenAmount
+            size: vTokenAmount,
+            entryPrice: entryPrice,
+            timestamp: block.timestamp
         });
 
         // --- Interactions with other contracts ---
@@ -99,6 +106,18 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
         usdc.approve(address(vault), collateralAmount);
         vault.deposit(collateralAmount);
         positionToken.mint(msg.sender, positionId);
+
+        // --- Emit event for indexing ---
+        emit PositionOpened(
+            positionId,
+            msg.sender,
+            marketToken,
+            direction,
+            collateralAmount,
+            vTokenAmount,
+            entryPrice,
+            block.timestamp
+        );
     }
 
     /**
@@ -145,6 +164,15 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
         if (payoutAmount > 0) {
             vault.withdraw(owner, payoutAmount);
         }
+
+        // --- Emit event for indexing ---
+        emit PositionClosed(
+            positionId,
+            owner,
+            pnl,
+            payoutAmount,
+            block.timestamp
+        );
     }
 
     // --- View functions ---
@@ -171,7 +199,9 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
             marketToken: pos.marketToken,
             collateral: pos.collateral,
             direction: pos.direction,
-            size: pos.size
+            size: pos.size,
+            entryPrice: pos.entryPrice,
+            timestamp: pos.timestamp
         });
     }
 
