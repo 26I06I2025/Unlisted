@@ -2,8 +2,8 @@
 pragma solidity ^0.8.20;
 
 import "./interfaces/IReader.sol";
-import "./interfaces/IClearingHouse.sol";
-import "./ClearingHouse.sol";
+import "../../02-trading-core/contracts/interfaces/IClearingHouse.sol";
+import "../../02-trading-core/contracts/ClearingHouse.sol";
 
 /**
  * @title Reader

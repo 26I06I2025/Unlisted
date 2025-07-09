@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./IClearingHouse.sol";
+import "../../../02-trading-core/contracts/interfaces/IClearingHouse.sol";
 
 /**
  * @title IReader
