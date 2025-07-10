@@ -10,7 +10,7 @@ describe("Trading Core Integration", function () {
     [owner, trader1, trader2] = await ethers.getSigners();
 
     // Deploy mock USDC
-    const MockERC20 = await ethers.getContractFactory("MockERC20");
+    const MockERC20 = await ethers.getContractFactory("contracts/mocks/MockERC20.sol:MockERC20");
     usdc = await MockERC20.deploy("USD Coin", "USDC", 6);
     await usdc.waitForDeployment();
 
@@ -300,7 +300,7 @@ describe("Trading Core Integration", function () {
   describe("Error Handling", function () {
     it("Should handle various error conditions gracefully", async function () {
       // Market not initialized
-      const uninitializedMarket = await (await ethers.getContractFactory("MockERC20")).deploy("Test", "TEST", 18);
+      const uninitializedMarket = await (await ethers.getContractFactory("contracts/mocks/MockERC20.sol:MockERC20")).deploy("Test", "TEST", 18);
       
       await expect(
         clearingHouse.connect(trader1).openPosition(

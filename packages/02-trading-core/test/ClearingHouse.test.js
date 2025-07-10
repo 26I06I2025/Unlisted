@@ -10,7 +10,7 @@ describe("ClearingHouse", function () {
     [owner, trader1, trader2] = await ethers.getSigners();
 
     // Deploy mock USDC
-    const MockERC20 = await ethers.getContractFactory("MockERC20");
+    const MockERC20 = await ethers.getContractFactory("contracts/mocks/MockERC20.sol:MockERC20");
     usdc = await MockERC20.deploy("USD Coin", "USDC", 6); // 6 decimals like real USDC
     await usdc.waitForDeployment();
 
@@ -45,7 +45,7 @@ describe("ClearingHouse", function () {
     );
 
     // Deploy mock market token
-    const MockMarketToken = await ethers.getContractFactory("MockERC20");
+    const MockMarketToken = await ethers.getContractFactory("contracts/mocks/MockERC20.sol:MockERC20");
     marketToken = await MockMarketToken.deploy("Gold Token", "GOLD", 18);
     await marketToken.waitForDeployment();
 
@@ -171,7 +171,7 @@ describe("ClearingHouse", function () {
 
     it("Should revert with inactive market", async function () {
       // Create another market token but don't initialize
-      const MockMarketToken = await ethers.getContractFactory("MockERC20");
+      const MockMarketToken = await ethers.getContractFactory("contracts/mocks/MockERC20.sol:MockERC20");
       const inactiveMarket = await MockMarketToken.deploy("Inactive", "INACT", 18);
 
       await expect(

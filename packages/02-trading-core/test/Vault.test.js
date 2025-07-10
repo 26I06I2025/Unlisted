@@ -9,7 +9,7 @@ describe("Vault", function () {
     [owner, user1, user2] = await ethers.getSigners();
 
     // Deploy mock USDC
-    const MockERC20 = await ethers.getContractFactory("MockERC20");
+    const MockERC20 = await ethers.getContractFactory("contracts/mocks/MockERC20.sol:MockERC20");
     usdc = await MockERC20.deploy("USD Coin", "USDC", 6);
     await usdc.waitForDeployment();
 
