@@ -110,4 +110,18 @@ interface IClearingHouse {
     function getPosition(
         uint256 positionId
     ) external view returns (PositionView memory);
+
+    /**
+     * @notice Previews the result of opening a position without executing it.
+     * @param marketToken The market token to trade.
+     * @param collateralAmount The amount of collateral (USDC) to deposit.
+     * @param direction The desired direction for the position (LONG or SHORT).
+     * @return vTokenAmount The amount of vTokenX that would be received.
+     * @return entryPrice The entry price for the position.
+     */
+    function previewOpenPosition(
+        address marketToken,
+        uint256 collateralAmount,
+        Direction direction
+    ) external view returns (uint256 vTokenAmount, uint256 entryPrice);
 }

@@ -205,6 +205,34 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
         });
     }
 
+    /**
+     * @inheritdoc IClearingHouse
+     */
+    function previewOpenPosition(
+        address marketToken,
+        uint256 collateralAmount,
+        Direction direction
+    ) external view override returns (uint256 vTokenAmount, uint256 entryPrice) {
+        require(collateralAmount > 0, "ClearingHouse: Collateral must be positive");
+        
+        Market storage market = markets[marketToken];
+        require(market.isActive, "ClearingHouse: Market not active");
+
+        // Calculate entry price before trade impact
+        entryPrice = AMMMathLib.calculateMarkPrice(market.reserve_vUSDC, market.reserve_vTokenX);
+
+        // Calculate vToken amount that would be received
+        if (direction == Direction.LONG) {
+            (vTokenAmount,,) = AMMMathLib.calculateLongOpen(
+                collateralAmount, market.reserve_vUSDC, market.reserve_vTokenX
+            );
+        } else { // SHORT
+            (vTokenAmount,,) = AMMMathLib.calculateShortOpen(
+                collateralAmount, market.reserve_vUSDC, market.reserve_vTokenX
+            );
+        }
+    }
+
     // --- ITradingCore Implementation ---
 
     /**
