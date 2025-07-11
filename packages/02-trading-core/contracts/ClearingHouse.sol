@@ -83,14 +83,14 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
             );
         }
         
-        // Update reserves
-        market.reserve_vUSDC = newReserve_vUSDC;
-        market.reserve_vTokenX = newReserve_vTokenX;
-
         positionId = _nextPositionId++;
 
         // Calculate entry price before opening position
         uint256 entryPrice = AMMMathLib.calculateMarkPrice(market.reserve_vUSDC, market.reserve_vTokenX);
+        
+        // Update reserves
+        market.reserve_vUSDC = newReserve_vUSDC;
+        market.reserve_vTokenX = newReserve_vTokenX;
 
         positions[positionId] = Position({
             marketToken: marketToken,
