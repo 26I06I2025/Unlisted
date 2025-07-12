@@ -92,6 +92,7 @@ contract Registry is IRegistry, Ownable {
         // Initialize market in Trading Core
         if (address(tradingCore) != address(0)) {
             tradingCore.initializeMarket(_marketAddress, _reserve_vUSDC, _reserve_vTokenX);
+            tradingCore.updateMarketStatus(_marketAddress, uint8(MarketStatus.Created));
         }
         
         emit MarketCreated(_marketAddress, _name, _symbol);
@@ -136,6 +137,12 @@ contract Registry is IRegistry, Ownable {
      */
     function listMarket(address _marketAddress) external onlyOwner marketIsInStatus(_marketAddress, MarketStatus.Created) {
         markets[_marketAddress].status = MarketStatus.Active;
+        
+        // Push status change to Trading Core
+        if (address(tradingCore) != address(0)) {
+            tradingCore.updateMarketStatus(_marketAddress, uint8(MarketStatus.Active));
+        }
+        
         emit MarketStatusChanged(_marketAddress, MarketStatus.Active);
     }
 
@@ -146,6 +153,12 @@ contract Registry is IRegistry, Ownable {
      */
     function pauseMarket(address _marketAddress) external onlyOwner marketIsInStatus(_marketAddress, MarketStatus.Active) {
         markets[_marketAddress].status = MarketStatus.Paused;
+        
+        // Push status change to Trading Core
+        if (address(tradingCore) != address(0)) {
+            tradingCore.updateMarketStatus(_marketAddress, uint8(MarketStatus.Paused));
+        }
+        
         emit MarketStatusChanged(_marketAddress, MarketStatus.Paused);
     }
 
@@ -156,6 +169,12 @@ contract Registry is IRegistry, Ownable {
      */
     function resumeMarket(address _marketAddress) external onlyOwner marketIsInStatus(_marketAddress, MarketStatus.Paused) {
         markets[_marketAddress].status = MarketStatus.Active;
+        
+        // Push status change to Trading Core
+        if (address(tradingCore) != address(0)) {
+            tradingCore.updateMarketStatus(_marketAddress, uint8(MarketStatus.Active));
+        }
+        
         emit MarketStatusChanged(_marketAddress, MarketStatus.Active);
     }
 
@@ -170,6 +189,12 @@ contract Registry is IRegistry, Ownable {
             "Registry: Market not active or paused"
         );
         markets[_marketAddress].status = MarketStatus.ClosingOnly;
+        
+        // Push status change to Trading Core
+        if (address(tradingCore) != address(0)) {
+            tradingCore.updateMarketStatus(_marketAddress, uint8(MarketStatus.ClosingOnly));
+        }
+        
         emit MarketStatusChanged(_marketAddress, MarketStatus.ClosingOnly);
     }
 
@@ -181,6 +206,12 @@ contract Registry is IRegistry, Ownable {
     function settleMarket(address _marketAddress) external onlyOwner marketIsInStatus(_marketAddress, MarketStatus.ClosingOnly) {
         tradingCore.freezePrice(_marketAddress);
         markets[_marketAddress].status = MarketStatus.Settled;
+        
+        // Push status change to Trading Core
+        if (address(tradingCore) != address(0)) {
+            tradingCore.updateMarketStatus(_marketAddress, uint8(MarketStatus.Settled));
+        }
+        
         emit MarketStatusChanged(_marketAddress, MarketStatus.Settled);
     }
     
@@ -192,6 +223,12 @@ contract Registry is IRegistry, Ownable {
     function archiveMarket(address _marketAddress) external onlyOwner marketIsInStatus(_marketAddress, MarketStatus.Settled) {
         require(!tradingCore.hasOpenPositions(_marketAddress), "Registry: Positions still open");
         markets[_marketAddress].status = MarketStatus.Archived;
+        
+        // Push status change to Trading Core
+        if (address(tradingCore) != address(0)) {
+            tradingCore.updateMarketStatus(_marketAddress, uint8(MarketStatus.Archived));
+        }
+        
         emit MarketStatusChanged(_marketAddress, MarketStatus.Archived);
     }
 

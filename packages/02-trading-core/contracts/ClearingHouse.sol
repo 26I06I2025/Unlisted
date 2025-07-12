@@ -8,6 +8,7 @@ import "./lib/AMMMathLib.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../../01-registry/contracts/interfaces/ITradingCore.sol";
+import "../../01-registry/contracts/interfaces/IRegistry.sol";
 
 /**
  * @title ClearingHouse
@@ -26,7 +27,8 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
     struct Market {
         uint256 reserve_vUSDC;
         uint256 reserve_vTokenX;
-        bool isActive;
+        IRegistry.MarketStatus status;  // Synchronized status from Registry
+        bool isActive;  // Computed from status for backwards compatibility
     }
     mapping(address => Market) public markets;
 
@@ -260,6 +262,7 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
         markets[marketToken] = Market({
             reserve_vUSDC: vUSDC,
             reserve_vTokenX: vTokenX,
+            status: IRegistry.MarketStatus.Active,
             isActive: true
         });
     }
@@ -268,6 +271,9 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
      * @inheritdoc ITradingCore
      */
     function freezePrice(address marketAddress) external override {
+        // Only Registry can freeze markets for settlement process
+        require(msg.sender == registry, "ClearingHouse: Only registry can freeze markets");
+        
         // Freeze market by disabling new position creation
         Market storage market = markets[marketAddress];
         market.isActive = false;
@@ -294,5 +300,19 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
         // Update reserves from Registry - this maintains Registry as source of truth for admin changes
         markets[marketToken].reserve_vUSDC = vUSDC;
         markets[marketToken].reserve_vTokenX = vTokenX;
+    }
+
+    /**
+     * @inheritdoc ITradingCore
+     */
+    function updateMarketStatus(address marketToken, uint8 status) external override {
+        // Only Registry can push status updates to maintain synchronization
+        require(msg.sender == registry, "ClearingHouse: Only registry can update market status");
+        
+        Market storage market = markets[marketToken];
+        market.status = IRegistry.MarketStatus(status);
+        
+        // Update isActive based on status for backwards compatibility
+        market.isActive = (market.status == IRegistry.MarketStatus.Active);
     }
 }

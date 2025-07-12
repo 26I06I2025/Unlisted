@@ -25,6 +25,14 @@ interface ITradingCore {
     function updateReserves(address marketToken, uint256 vUSDC, uint256 vTokenX) external;
 
     /**
+     * @notice Met à jour le statut d'un marché existant.
+     * @dev Permet au Registry de synchroniser le statut avec le Trading Core.
+     * @param marketToken L'adresse du token de marché.
+     * @param status Le nouveau statut du marché.
+     */
+    function updateMarketStatus(address marketToken, uint8 status) external;
+
+    /**
      * @notice Ordonne au Trading Core de figer le prix d'un marché pour le règlement final.
      * @param marketAddress L'adresse du marché à geler.
      */
