@@ -40,6 +40,9 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
     }
     mapping(uint256 => Position) public positions;
     uint256 private _nextPositionId;
+    
+    // Number of open positions per market
+    mapping(address => uint256) public openPositionCount;
 
     /**
      * @notice Initializes the ClearingHouse.
@@ -101,6 +104,9 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
             timestamp: block.timestamp
         });
 
+        // Increment position count for this market
+        openPositionCount[marketToken]++;
+
         // --- Interactions with other contracts ---
         usdc.transferFrom(msg.sender, address(this), collateralAmount);
         usdc.approve(address(vault), collateralAmount);
@@ -156,6 +162,9 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
         if (totalToReturn > 0) {
             payoutAmount = uint256(totalToReturn);
         }
+        
+        // Decrement position count for this market
+        openPositionCount[pos.marketToken]--;
         
         delete positions[positionId];
         
@@ -261,13 +270,10 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
 
     /**
      * @inheritdoc ITradingCore
-     * @dev This function intentionally returns false as position verification 
-     * is handled by The Graph subgraph in the frontend before calling archiveMarket().
-     * This approach is consistent with modern DeFi protocols that use off-chain
-     * indexing for complex state queries while keeping smart contracts simple.
+     * @dev Returns true if there are any open positions for the given market.
+     * This function now provides proper on-chain verification for market archiving safety.
      */
-    function hasOpenPositions(address /* marketAddress */) external pure override returns (bool) {
-        // Frontend/admin must verify via The Graph before archiving
-        return false;
+    function hasOpenPositions(address marketAddress) external view override returns (bool) {
+        return openPositionCount[marketAddress] > 0;
     }
 }
