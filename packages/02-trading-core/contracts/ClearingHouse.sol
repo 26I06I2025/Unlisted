@@ -20,7 +20,7 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
     IVault public immutable vault;
     PositionToken public immutable positionToken;
     IERC20 public immutable usdc;
-    address public immutable registry;
+    address public immutable registry;  // Registry reference for reserves synchronization
 
     // --- Multi-market vAMM state ---
     struct Market {
@@ -251,6 +251,7 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
      * @inheritdoc ITradingCore
      */
     function initializeMarket(address marketToken, uint256 vUSDC, uint256 vTokenX) external override {
+        // Only Registry can initialize markets to maintain controlled market creation
         require(msg.sender == registry, "ClearingHouse: Only registry can initialize markets");
         require(marketToken != address(0), "ClearingHouse: Invalid market token");
         require(vUSDC > 0 && vTokenX > 0, "ClearingHouse: Invalid reserves");
@@ -285,10 +286,12 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
      * @inheritdoc ITradingCore
      */
     function updateReserves(address marketToken, uint256 vUSDC, uint256 vTokenX) external override {
+        // Only Registry can push reserve updates to maintain synchronization
         require(msg.sender == registry, "ClearingHouse: Only registry can update reserves");
         require(markets[marketToken].isActive, "ClearingHouse: Market not active");
         require(vUSDC > 0 && vTokenX > 0, "ClearingHouse: Invalid reserves");
         
+        // Update reserves from Registry - this maintains Registry as source of truth for admin changes
         markets[marketToken].reserve_vUSDC = vUSDC;
         markets[marketToken].reserve_vTokenX = vTokenX;
     }
