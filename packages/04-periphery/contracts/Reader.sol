@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "./interfaces/IReader.sol";
 import "../../02-trading-core/contracts/interfaces/IClearingHouse.sol";
 import "../../02-trading-core/contracts/ClearingHouse.sol";
+import "../../01-registry/contracts/interfaces/IRegistry.sol";
 
 /**
  * @title Reader
@@ -77,10 +78,13 @@ contract Reader is IReader {
         external view override returns (MarketData memory market) {
         
         // Get market info from ClearingHouse
-        (uint256 reserve_vUSDC, uint256 reserve_vTokenX, bool isActive) = clearingHouse.markets(marketToken);
+        (uint256 reserve_vUSDC, uint256 reserve_vTokenX, IRegistry.MarketStatus status) = clearingHouse.markets(marketToken);
         
         // Calculate current price
         uint256 currentPrice = clearingHouse.getMarkPrice(marketToken);
+        
+        // Calculate isActive from status
+        bool isActive = (status == IRegistry.MarketStatus.Active);
 
         market = MarketData({
             marketToken: marketToken,

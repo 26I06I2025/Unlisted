@@ -28,7 +28,6 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
         uint256 reserve_vUSDC;
         uint256 reserve_vTokenX;
         IRegistry.MarketStatus status;  // Synchronized status from Registry
-        bool isActive;  // Computed from status for backwards compatibility
     }
     mapping(address => Market) public markets;
 
@@ -74,7 +73,7 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
         require(collateralAmount > 0, "ClearingHouse: Collateral must be positive");
         
         Market storage market = markets[marketToken];
-        require(market.isActive, "ClearingHouse: Market not active");
+        require(market.status == IRegistry.MarketStatus.Active, "ClearingHouse: Market not active");
 
         // --- Calculations (delegated to AMMMathLib) ---
         uint256 vTokenAmount;
@@ -230,7 +229,7 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
         require(collateralAmount > 0, "ClearingHouse: Collateral must be positive");
         
         Market storage market = markets[marketToken];
-        require(market.isActive, "ClearingHouse: Market not active");
+        require(market.status == IRegistry.MarketStatus.Active, "ClearingHouse: Market not active");
 
         // Calculate entry price before trade impact
         entryPrice = AMMMathLib.calculateMarkPrice(market.reserve_vUSDC, market.reserve_vTokenX);
@@ -257,13 +256,12 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
         require(msg.sender == registry, "ClearingHouse: Only registry can initialize markets");
         require(marketToken != address(0), "ClearingHouse: Invalid market token");
         require(vUSDC > 0 && vTokenX > 0, "ClearingHouse: Invalid reserves");
-        require(!markets[marketToken].isActive, "ClearingHouse: Market already exists");
+        require(markets[marketToken].status == IRegistry.MarketStatus.None, "ClearingHouse: Market already exists");
         
         markets[marketToken] = Market({
             reserve_vUSDC: vUSDC,
             reserve_vTokenX: vTokenX,
-            status: IRegistry.MarketStatus.Active,
-            isActive: true
+            status: IRegistry.MarketStatus.Active
         });
     }
 
@@ -274,9 +272,9 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
         // Only Registry can freeze markets for settlement process
         require(msg.sender == registry, "ClearingHouse: Only registry can freeze markets");
         
-        // Freeze market by disabling new position creation
+        // Freeze market by updating status to ClosingOnly
         Market storage market = markets[marketAddress];
-        market.isActive = false;
+        market.status = IRegistry.MarketStatus.ClosingOnly;
     }
 
     /**
@@ -294,7 +292,7 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
     function updateReserves(address marketToken, uint256 vUSDC, uint256 vTokenX) external override {
         // Only Registry can push reserve updates to maintain synchronization
         require(msg.sender == registry, "ClearingHouse: Only registry can update reserves");
-        require(markets[marketToken].isActive, "ClearingHouse: Market not active");
+        require(markets[marketToken].status == IRegistry.MarketStatus.Active, "ClearingHouse: Market not active");
         require(vUSDC > 0 && vTokenX > 0, "ClearingHouse: Invalid reserves");
         
         // Update reserves from Registry - this maintains Registry as source of truth for admin changes
@@ -311,8 +309,5 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
         
         Market storage market = markets[marketToken];
         market.status = IRegistry.MarketStatus(status);
-        
-        // Update isActive based on status for backwards compatibility
-        market.isActive = (market.status == IRegistry.MarketStatus.Active);
     }
 }
