@@ -121,6 +121,11 @@ contract Registry is IRegistry, Ownable {
         market.reserve_vUSDC = _newReserve_vUSDC;
         market.reserve_vTokenX = _newReserve_vTokenX;
         
+        // Synchronize reserves with Trading Core
+        if (address(tradingCore) != address(0)) {
+            tradingCore.updateReserves(_marketAddress, _newReserve_vUSDC, _newReserve_vTokenX);
+        }
+        
         emit MarketReservesUpdated(_marketAddress, oldUSDC, oldTokenX, _newReserve_vUSDC, _newReserve_vTokenX);
     }
 

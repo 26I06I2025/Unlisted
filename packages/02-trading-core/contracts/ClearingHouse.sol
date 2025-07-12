@@ -20,6 +20,7 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
     IVault public immutable vault;
     PositionToken public immutable positionToken;
     IERC20 public immutable usdc;
+    address public immutable registry;
 
     // --- Multi-market vAMM state ---
     struct Market {
@@ -50,11 +51,13 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
     constructor(
         address _vaultAddress,
         address _positionTokenAddress,
-        address _usdcAddress
+        address _usdcAddress,
+        address _registryAddress
     ) {
         vault = IVault(_vaultAddress);
         positionToken = PositionToken(_positionTokenAddress);
         usdc = IERC20(_usdcAddress);
+        registry = _registryAddress;
         _nextPositionId = 1;
     }
 
@@ -248,6 +251,7 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
      * @inheritdoc ITradingCore
      */
     function initializeMarket(address marketToken, uint256 vUSDC, uint256 vTokenX) external override {
+        require(msg.sender == registry, "ClearingHouse: Only registry can initialize markets");
         require(marketToken != address(0), "ClearingHouse: Invalid market token");
         require(vUSDC > 0 && vTokenX > 0, "ClearingHouse: Invalid reserves");
         require(!markets[marketToken].isActive, "ClearingHouse: Market already exists");
@@ -275,5 +279,17 @@ contract ClearingHouse is IClearingHouse, ITradingCore, ReentrancyGuard {
      */
     function hasOpenPositions(address marketAddress) external view override returns (bool) {
         return openPositionCount[marketAddress] > 0;
+    }
+
+    /**
+     * @inheritdoc ITradingCore
+     */
+    function updateReserves(address marketToken, uint256 vUSDC, uint256 vTokenX) external override {
+        require(msg.sender == registry, "ClearingHouse: Only registry can update reserves");
+        require(markets[marketToken].isActive, "ClearingHouse: Market not active");
+        require(vUSDC > 0 && vTokenX > 0, "ClearingHouse: Invalid reserves");
+        
+        markets[marketToken].reserve_vUSDC = vUSDC;
+        markets[marketToken].reserve_vTokenX = vTokenX;
     }
 }

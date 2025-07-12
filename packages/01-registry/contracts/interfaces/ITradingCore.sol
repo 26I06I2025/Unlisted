@@ -16,6 +16,15 @@ interface ITradingCore {
     function initializeMarket(address marketToken, uint256 vUSDC, uint256 vTokenX) external;
 
     /**
+     * @notice Met à jour les réserves d'un marché existant.
+     * @dev Permet au Registry de synchroniser les réserves avec le Trading Core.
+     * @param marketToken L'adresse du token de marché.
+     * @param vUSDC Les nouvelles réserves virtuelles en USDC.
+     * @param vTokenX Les nouvelles réserves virtuelles en TokenX.
+     */
+    function updateReserves(address marketToken, uint256 vUSDC, uint256 vTokenX) external;
+
+    /**
      * @notice Ordonne au Trading Core de figer le prix d'un marché pour le règlement final.
      * @param marketAddress L'adresse du marché à geler.
      */
